@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Mike's Workout Log</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { background: #38383d; color: #fff; font-family: 'Courier New', monospace; min-height: 100vh; padding-bottom: 100px; }
+
+  .header { padding: 20px 16px 0; position: sticky; top: 0; background: #38383d; z-index: 10; border-bottom: 2px solid #ffffff22; }
+  .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .header-label { font-size: 13px; letter-spacing: 4px; text-transform: uppercase; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; display: inline-block; margin-right: 5px; transition: background 0.3s; }
+  .status-dot.connected { background: #5affa3; }
+  .status-dot.saving { background: #f97316; }
+  .status-dot.error { background: #ff6b6b; }
+  .status-label { font-size: 12px; color: #aaa; letter-spacing: 1px; }
+  .edit-mode-btn { background: #555; border: none; border-radius: 8px; color: #fff; font-family: inherit; font-size: 13px; font-weight: 700; letter-spacing: 1px; padding: 5px 10px; cursor: pointer; }
+  .edit-mode-btn.active { background: #f97316; color: #000; }
+  .day-title { font-size: 25px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 12px; }
+  .edit-inline { background: #48484d; border: 1.5px solid #888; border-radius: 6px; color: #fff; font-family: inherit; font-size: 17px; padding: 4px 10px; outline: none; width: 100%; max-width: 320px; }
+  .tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 12px; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { background: transparent; border: 1.5px solid #555; border-radius: 6px; color: #bbb; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 700; letter-spacing: 1px; padding: 6px 12px; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
+  .tab.active { color: #000; }
+
+  .content { padding: 16px; }
+  .superset-card { background: #48484d; border: 1px solid #555; border-radius: 12px; margin-bottom: 14px; overflow: hidden; }
+  .ss-header { padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); gap: 8px; flex-wrap: wrap; }
+  .ss-header-left { display: flex; align-items: center; gap: 8px; }
+  .rounds-badge { font-size: 12px; font-weight: 800; letter-spacing: 1.5px; padding: 2px 8px; border-radius: 4px; color: #000; white-space: nowrap; }
+  .ss-type { color: #999; font-size: 13px; letter-spacing: 1px; }
+  .set-circles { display: flex; gap: 7px; align-items: center; }
+  .set-circle { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #777; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: inherit; font-size: 13px; font-weight: 700; color: #bbb; transition: all 0.15s; flex-shrink: 0; }
+  .set-circle.done { color: #000; font-size: 15px; }
+  .rounds-controls { display: flex; align-items: center; gap: 6px; }
+  .rounds-btn { background: #555; border: none; border-radius: 4px; color: #fff; cursor: pointer; font-family: inherit; font-size: 18px; font-weight: 700; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; }
+  .rounds-val { font-size: 16px; font-weight: 700; min-width: 24px; text-align: center; }
+  .rounds-lbl { font-size: 12px; color: #aaa; letter-spacing: 1px; }
+
+  .exercise-row { padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid #555; }
+  .exercise-row:last-child { border-bottom: none; }
+  .ex-info { flex: 1; min-width: 0; }
+  .ex-name { font-size: 16px; font-weight: 600; line-height: 1.3; margin-bottom: 3px; }
+  .ex-reps { font-size: 14px; color: #ccc; }
+  .ex-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+
+  .weight-btn { background: #555; border: 1.5px solid #666; border-radius: 8px; color: #ddd; cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 400; padding: 6px 12px; min-width: 80px; text-align: center; transition: all 0.15s; }
+  .weight-btn.has-weight { font-weight: 700; }
+  .history-toggle { background: none; border: none; color: #aaa; cursor: pointer; font-family: inherit; font-size: 12px; padding: 0 2px; letter-spacing: 0.5px; }
+  .weight-edit { display: flex; gap: 5px; align-items: center; }
+  .weight-input { background: #38383d; border-radius: 6px; color: #fff; font-family: inherit; font-size: 15px; padding: 5px 9px; width: 120px; outline: none; border: 1.5px solid #888; }
+  .btn-confirm { border: none; border-radius: 6px; color: #000; cursor: pointer; font-family: inherit; font-size: 15px; font-weight: 800; padding: 5px 10px; }
+  .btn-cancel { background: #555; border: none; border-radius: 6px; color: #eee; cursor: pointer; font-family: inherit; font-size: 15px; font-weight: 700; padding: 5px 9px; }
+
+  .history-panel { background: #38383d; border-top: 1px solid #555; padding: 10px 14px; display: none; }
+  .history-panel.open { display: block; }
+  .history-title { font-size: 12px; letter-spacing: 1.5px; color: #aaa; text-transform: uppercase; margin-bottom: 8px; }
+  .history-row { display: flex; justify-content: space-between; font-size: 14px; padding: 4px 0; border-bottom: 1px solid #555; }
+  .history-row:last-child { border-bottom: none; }
+  .history-date { color: #888; }
+
+  .edit-ex-row { padding: 12px 14px; display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid #555; }
+  .edit-ex-row:last-child { border-bottom: none; }
+  .edit-ex-fields { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .edit-field { background: #38383d; border: 1.5px solid #666; border-radius: 6px; color: #fff; font-family: inherit; font-size: 15px; padding: 5px 9px; outline: none; width: 100%; }
+  .edit-field:focus { border-color: #aaa; }
+  .edit-actions { display: flex; gap: 6px; padding: 10px 14px; border-top: 1px solid #555; flex-wrap: wrap; }
+  .btn-sm { border: none; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 700; padding: 6px 12px; letter-spacing: 0.5px; }
+  .btn-add    { background: #5affa322; color: #5affa3; border: 1px solid #5affa344; }
+  .btn-danger { background: #ff6b6b22; color: #ff6b6b; border: 1px solid #ff6b6b44; }
+  .btn-muted  { background: #555; color: #ccc; border: 1px solid #666; }
+
+  .add-superset-btn { width: 100%; background: #48484d; border: 1px dashed #666; border-radius: 12px; color: #888; cursor: pointer; font-family: inherit; font-size: 14px; padding: 14px; letter-spacing: 1px; margin-bottom: 14px; transition: all 0.15s; }
+  .add-superset-btn:active { opacity: 0.7; }
+  .footer { text-align: center; color: #555; font-size: 13px; letter-spacing: 1px; margin-top: 20px; padding: 0 16px; }
+</style>
+</head>
+<body>
+
+<!-- Firebase SDKs -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCLo-O5a6U9Ndi-KTjW6ari-Vomxr3NGUs",
+  authDomain: "workout-tracker-e4d3f.firebaseapp.com",
+  projectId: "workout-tracker-e4d3f",
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+// ── expose db functions to global scope ──────────────────────────
+window._fbGet = async (docId) => {
+  const snap = await getDoc(doc(db, 'workout', docId));
+  return snap.exists() ? snap.data() : null;
+};
+window._fbSet = async (docId, data) => {
+  await setDoc(doc(db, 'workout', docId), data, { merge: true });
+};
+
+window._fbReady();
+</script>
+
+<script>
+// ── WORKOUT DATA ─────────────────────────────────────────────────
+let WORKOUTS = {
+  Monday:    { label: "Back / Legs", color: "#e8ff5a", supersets: [
+    { rounds: 3, exercises: [{ name: "Trap Bar", reps: "10 reps" }, { name: "Rotational Ball Throws into Wall", reps: "8 reps" }] },
+    { rounds: 3, exercises: [{ name: "Barbell Row", reps: "12 reps" }, { name: "Bear Slides", reps: "8 reps" }] },
+    { rounds: 3, exercises: [{ name: "Seated Lat Pull Down", reps: "12 reps" }, { name: "Facepull", reps: "12 reps" }] },
+    { rounds: 3, exercises: [{ name: "Seated Row", reps: "12 reps" }, { name: "Deadbug", reps: "8 reps" }] },
+    { rounds: 4, exercises: [{ name: "Bicep Curl", reps: "12 reps" }] },
+  ]},
+  Tuesday:   { label: "Chest / Shoulders / Triceps", color: "#ff6b6b", supersets: [
+    { rounds: 3, exercises: [{ name: "Bench", reps: "10 reps" }, { name: "Band Pull Apart", reps: "12 reps" }] },
+    { rounds: 3, exercises: [{ name: "Incline DB", reps: "10 reps" }, { name: "Lat DB Fly", reps: "12 reps" }] },
+    { rounds: 3, exercises: [{ name: "Seated Machine Shoulder Press", reps: "10 reps" }, { name: "Cable High Pull", reps: "12 reps" }] },
+    { rounds: 3, exercises: [{ name: "Seated Machine Fly", reps: "15 reps" }] },
+    { rounds: 4, exercises: [{ name: "Tricep Extension - Cable", reps: "12 reps" }] },
+  ]},
+  Wednesday: { label: "Legs", color: "#5affa3", supersets: [
+    { rounds: 3, exercises: [{ name: "Safety Bar Squat", reps: "10 reps" }, { name: "Deadbug", reps: "8 reps" }] },
+    { rounds: 3, exercises: [{ name: "Hack Squat", reps: "12 reps" }, { name: "Reverse Hyper", reps: "12 reps" }] },
+    { rounds: 3, exercises: [{ name: "Split Squat", reps: "10 reps" }, { name: "Leg Curl", reps: "12 reps" }] },
+    { rounds: 3, exercises: [{ name: "Power Squat", reps: "10 reps" }, { name: "Sled Push", reps: "30 yards" }] },
+  ]},
+  Thursday:  { label: "Back & Biceps", color: "#a78bfa", supersets: [
+    { rounds: 4, exercises: [{ name: "Barbell Row", reps: "10 reps" }, { name: "Facepull", reps: "12 reps" }] },
+    { rounds: 3, exercises: [{ name: "Lat Pull Down Cable", reps: "12 reps" }, { name: "Straight Arm Pull Down", reps: "12 reps" }] },
+    { rounds: 3, exercises: [{ name: "Seated Machine Row", reps: "12 reps" }, { name: "V-Ups", reps: "12 reps" }] },
+    { rounds: 3, exercises: [{ name: "Lever Row", reps: "15 reps" }, { name: "Reverse DB Fly", reps: "15 reps" }] },
+    { rounds: 4, exercises: [{ name: "Seated Incline DB Curl", reps: "12 reps" }] },
+  ]},
+  Friday:    { label: "Chest / Shoulders / Triceps", color: "#f97316", supersets: [
+    { rounds: 4, exercises: [{ name: "Incline Bench", reps: "8 reps" }] },
+    { rounds: 3, exercises: [{ name: "Barbell Overhead Press", reps: "10 reps" }, { name: "Deadbugs", reps: "6 reps" }] },
+    { rounds: 3, exercises: [{ name: "Smith Machine Bench (1 notch up)", reps: "10 reps" }, { name: "Lateral DB Fly", reps: "12 reps" }] },
+    { rounds: 3, exercises: [{ name: "Dips", reps: "to failure" }, { name: "Rope High Pull", reps: "12 reps" }] },
+    { rounds: 4, exercises: [{ name: "EZ Curl Bar Cable Tricep Extension", reps: "12 reps" }] },
+  ]},
+  Saturday:  { label: "Legs", color: "#38bdf8", supersets: [
+    { rounds: 4, exercises: [{ name: "Power Squat", reps: "10 reps" }] },
+    { rounds: 3, exercises: [{ name: "Split Squat", reps: "10 reps" }, { name: "Reverse Hyper", reps: "12 reps" }] },
+    { rounds: 3, exercises: [{ name: "Leg Press", reps: "12 reps" }, { name: "Leg Curl", reps: "12 reps" }] },
+    { rounds: 4, exercises: [{ name: "Leg Extension", reps: "12 reps" }, { name: "Heels Elevated Goblet Partials", reps: "15 reps" }] },
+  ]},
+};
+
+const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+let weights = {}, history = {}, sets = {};
+let activeDay = (() => { const m={1:'Monday',2:'Tuesday',3:'Wednesday',4:'Thursday',5:'Friday',6:'Saturday'}; return m[new Date().getDay()]||'Monday'; })();
+let editingWeightKey = null, openHistoryKey = null, editMode = false, dbStatus = 'connecting';
+
+// ── FIREBASE BRIDGE ──────────────────────────────────────────────
+// Called once Firebase module is ready
+window._fbReady = async function() {
+  try {
+    const [wSnap, hSnap, sSnap] = await Promise.all([
+      window._fbGet('weights'),
+      window._fbGet('history'),
+      window._fbGet('structure'),
+    ]);
+    if (wSnap) weights = wSnap;
+    if (hSnap) history = hSnap;
+    if (sSnap && sSnap.data) WORKOUTS = JSON.parse(sSnap.data);
+    dbStatus = 'connected';
+  } catch(e) {
+    console.error(e);
+    dbStatus = 'error';
+  }
+  render();
+};
+
+async function dbSaveWeight(id, weight) {
+  dbStatus = 'saving'; renderStatus();
+  try {
+    weights[id] = weight;
+    await window._fbSet('weights', weights);
+    dbStatus = 'connected';
+  } catch { dbStatus = 'error'; }
+  renderStatus();
+}
+
+async function dbSaveHistory(id, entries) {
+  try {
+    history[id] = entries;
+    await window._fbSet('history', history);
+  } catch {}
+}
+
+async function dbSaveStructure() {
+  dbStatus = 'saving'; renderStatus();
+  try {
+    await window._fbSet('structure', { data: JSON.stringify(WORKOUTS) });
+    dbStatus = 'connected';
+  } catch { dbStatus = 'error'; }
+  renderStatus();
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────
+const wKey = (d,s,e) => `${d}__${s}__${e}`;
+const hKey = (d,s,e) => `history__${d}__${s}__${e}`;
+const sKey = (s,r)   => `${activeDay}__${s}__${r}`;
+const today = ()     => new Date().toLocaleDateString('en-CA');
+
+function renderStatus() {
+  const dot = document.getElementById('sdot'), lbl = document.getElementById('slbl');
+  if (!dot) return;
+  const m = { connecting:['','connecting…'], connected:['connected','synced'], saving:['saving','saving…'], error:['error','offline'] };
+  const [c,t] = m[dbStatus]||['',''];
+  dot.className = 'status-dot ' + c; lbl.textContent = t;
+}
+
+// ── RENDER ────────────────────────────────────────────────────────
+function render() {
+  const W = WORKOUTS[activeDay], ac = W.color;
+  const sm = { connecting:'', connected:'connected', saving:'saving', error:'error' };
+  const st = { connecting:'connecting…', connected:'synced', saving:'saving…', error:'offline' };
+
+  let h = `
+    <div class="header" style="border-bottom-color:${ac}44">
+      <div class="header-top">
+        <div class="header-label"><span style="color:${ac};font-weight:700">Mike's</span><span style="color:#999"> Workout Log</span></div>
+        <div class="header-right">
+          <span><span id="sdot" class="status-dot ${sm[dbStatus]||''}"></span><span id="slbl" class="status-label">${st[dbStatus]||''}</span></span>
+          <button class="edit-mode-btn${editMode?' active':''}" onclick="toggleEdit()">${editMode?'✓ Done':'✏ Edit'}</button>
+        </div>
+      </div>
+      <div class="day-title">
+        ${editMode
+          ? `<input class="edit-inline" value="${W.label.replace(/"/g,'&quot;')}" placeholder="Day label" style="border-color:${ac}" onchange="updateLabel(this.value)">`
+          : `${activeDay} <span style="color:${ac};font-size:13px;font-weight:400">— ${W.label}</span>`}
+      </div>
+      <div class="tabs">
+        ${DAYS.map(d => { const c=WORKOUTS[d].color, a=d===activeDay;
+          return `<button class="tab${a?' active':''}" style="${a?`background:${c};border-color:${c};`:''}" onclick="switchDay('${d}')">${d.slice(0,3).toUpperCase()}</button>`;
+        }).join('')}
+      </div>
+    </div><div class="content">`;
+
+  W.supersets.forEach((ss, si) => {
+    const ssType = ss.exercises.length > 1 ? 'SUPERSET' : 'STRAIGHT SET';
+
+    if (editMode) {
+      h += `<div class="superset-card">
+        <div class="ss-header" style="background:${ac}15;border-bottom-color:${ac}30">
+          <div class="ss-header-left">
+            <span class="rounds-badge" style="background:${ac}">${ss.rounds}×</span>
+            <span class="ss-type">${ssType}</span>
+          </div>
+          <div class="rounds-controls">
+            <span class="rounds-lbl">SETS</span>
+            <button class="rounds-btn" onclick="chgRounds(${si},-1)">−</button>
+            <span class="rounds-val">${ss.rounds}</span>
+            <button class="rounds-btn" onclick="chgRounds(${si},1)">+</button>
+          </div>
+        </div>`;
+      ss.exercises.forEach((ex, ei) => {
+        h += `<div class="edit-ex-row">
+          <div class="edit-ex-fields">
+            <input class="edit-field" value="${ex.name.replace(/"/g,'&quot;')}" placeholder="Exercise name" onchange="updName(${si},${ei},this.value)">
+            <input class="edit-field" value="${ex.reps.replace(/"/g,'&quot;')}" placeholder="Reps (e.g. 12 reps)" onchange="updReps(${si},${ei},this.value)">
+          </div>
+          ${ss.exercises.length > 1 ? `<button class="btn-sm btn-danger" style="margin-top:4px" onclick="rmEx(${si},${ei})">✕</button>` : ''}
+        </div>`;
+      });
+      h += `<div class="edit-actions">
+        <button class="btn-sm btn-add" onclick="addEx(${si})">+ Exercise</button>
+        ${W.supersets.length > 1 ? `<button class="btn-sm btn-danger" onclick="rmSS(${si})">Delete Group</button>` : ''}
+      </div></div>`;
+
+    } else {
+      const circles = Array.from({length:ss.rounds},(_,r) => {
+        const done = !!sets[sKey(si,r)];
+        return `<button class="set-circle${done?' done':''}" style="${done?`background:${ac};border-color:${ac};`:''}" onclick="toggleSet(${si},${r})">${done?'✓':r+1}</button>`;
+      }).join('');
+
+      h += `<div class="superset-card">
+        <div class="ss-header" style="background:${ac}15;border-bottom-color:${ac}30">
+          <div class="ss-header-left"><span class="rounds-badge" style="background:${ac}">${ss.rounds}×</span><span class="ss-type">${ssType}</span></div>
+          <div class="set-circles">${circles}</div>
+        </div>`;
+
+      ss.exercises.forEach((ex, ei) => {
+        const k = wKey(activeDay,si,ei), hk = hKey(activeDay,si,ei);
+        const w = weights[k], hist = history[hk]||[], isEd = editingWeightKey===k, isOp = openHistoryKey===k;
+        let wa;
+        if (isEd) {
+          wa = `<div class="weight-edit">
+            <input class="weight-input" id="inp_${k}" value="${(w||'').replace(/"/g,'&quot;')}" placeholder="e.g. 135 lbs" style="border-color:${ac}" onkeydown="hKey2(event,'${k}',${si},${ei})">
+            <button class="btn-confirm" style="background:${ac}" onclick="confirmW('${k}',${si},${ei})">✓</button>
+            <button class="btn-cancel" onclick="cancelW()">✕</button>
+          </div>`;
+        } else {
+          wa = `<button class="weight-btn${w?' has-weight':''}" style="${w?`background:${ac}22;border-color:${ac}88;color:${ac};`:''}" onclick="startW('${k}')">${w||'+ weight'}</button>
+          ${hist.length?`<button class="history-toggle" onclick="togHist('${k}')">${isOp?'hide':hist.length+' log'+(hist.length>1?'s':'')+'  ▾'}</button>`:''}`;
+        }
+        h += `<div class="exercise-row"><div class="ex-info"><div class="ex-name">${ex.name}</div><div class="ex-reps">${ex.reps}</div></div><div class="ex-right">${wa}</div></div>`;
+        if (hist.length) {
+          h += `<div class="history-panel${isOp?' open':''}" id="hist_${k}">
+            <div class="history-title">History</div>
+            ${[...hist].reverse().map(e=>`<div class="history-row"><span class="history-date">${e.date}</span><span class="history-weight" style="color:${ac}">${e.weight}</span></div>`).join('')}
+          </div>`;
+        }
+      });
+      h += `</div>`;
+    }
+  });
+
+  if (editMode) h += `<button class="add-superset-btn" onclick="addSS()">+ Add Superset Group</button>`;
+  h += `</div><div class="footer">${editMode?'EDIT MODE — TAP DONE WHEN FINISHED':'TAP + WEIGHT TO LOG · CIRCLES TO TRACK SETS · AUTO-SAVES'}</div>`;
+  document.body.innerHTML = h;
+
+  if (editingWeightKey) {
+    const inp = document.getElementById('inp_'+editingWeightKey);
+    if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length); }
+  }
+}
+
+// ── ACTIONS ──────────────────────────────────────────────────────
+function switchDay(d) { activeDay=d; sets={}; editingWeightKey=null; openHistoryKey=null; render(); }
+function toggleEdit()  { editMode=!editMode; editingWeightKey=null; openHistoryKey=null; render(); }
+function toggleSet(si,r) { const k=sKey(si,r); sets[k]=!sets[k]; render(); }
+function startW(k)   { editingWeightKey=k; openHistoryKey=null; render(); }
+function cancelW()   { editingWeightKey=null; render(); }
+function togHist(k)  { openHistoryKey=openHistoryKey===k?null:k; render(); }
+
+async function confirmW(k, si, ei) {
+  const inp = document.getElementById('inp_'+k); if (!inp) return;
+  const val = inp.value.trim(); if (!val) { cancelW(); return; }
+  weights[k] = val;
+  const hk = hKey(activeDay,si,ei), td = today(), ex = history[hk]||[];
+  history[hk] = [...ex.filter(e=>e.date!==td),{weight:val,date:td}].slice(-20);
+  editingWeightKey = null; render();
+  await dbSaveWeight(k, val);
+  await dbSaveHistory(hk, history[hk]);
+}
+
+function hKey2(e,k,si,ei) { if(e.key==='Enter') confirmW(k,si,ei); if(e.key==='Escape') cancelW(); }
+
+function updateLabel(v) { WORKOUTS[activeDay].label=v; dbSaveStructure(); }
+function updName(si,ei,v) { WORKOUTS[activeDay].supersets[si].exercises[ei].name=v; dbSaveStructure(); }
+function updReps(si,ei,v) { WORKOUTS[activeDay].supersets[si].exercises[ei].reps=v; dbSaveStructure(); }
+function chgRounds(si,d) { const ss=WORKOUTS[activeDay].supersets[si]; ss.rounds=Math.max(1,Math.min(10,ss.rounds+d)); render(); dbSaveStructure(); }
+function addEx(si) { WORKOUTS[activeDay].supersets[si].exercises.push({name:'',reps:''}); render(); dbSaveStructure(); }
+function rmEx(si,ei) { const s=WORKOUTS[activeDay].supersets[si]; if(s.exercises.length<=1) return; s.exercises.splice(ei,1); render(); dbSaveStructure(); }
+function addSS() { WORKOUTS[activeDay].supersets.push({rounds:3,exercises:[{name:'',reps:''}]}); render(); dbSaveStructure(); }
+function rmSS(si) { const ss=WORKOUTS[activeDay].supersets; if(ss.length<=1) return; ss.splice(si,1); render(); dbSaveStructure(); }
+
+// Show connecting state immediately while Firebase loads
+render();
+</script>
+</body>
+</html>
